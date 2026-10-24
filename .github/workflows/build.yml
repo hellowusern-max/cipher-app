@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build APK Fixed
 
 on:
   push:
@@ -7,7 +7,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # مهم جداً، لا تستخدم ubuntu-latest
+
     steps:
     - uses: actions/checkout@v4
 
@@ -16,23 +17,31 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install dependencies
+    - name: Install System Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y python3-pip openjdk-17-jdk zip unzip git \
+        python3-setuptools libssl-dev libffi-dev \
+        libltdl-dev libbz2-dev libreadline-dev libsqlite3-dev \
+        libncurses5-dev libncursesw5-dev zlib1g-dev \
+        libjpeg8-dev libfreetype6-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+        autoconf libtool pkg-config
+
+    - name: Install Buildozer and Cython
       run: |
         pip install --upgrade pip
-        pip install buildozer cython==0.29.33
+        pip install cython==0.29.33 buildozer
+        buildozer --version
 
-    - name: Build APK
-      uses: ArtemSBulgakov/buildozer-action@v1
-      id: buildozer
-      with:
-        workdir: .
-        command: buildozer android debug
-        buildozer_version: stable
+    - name: Build APK (Debug)
+      run: |
+        yes | buildozer android debug
+      env:
+        ACCEPT_SDK_LICENSE_AGREEMENT: "yes"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: YT-Loader-APK
-        path: |
-          bin/*.apk
-          ./**/*.apk
+        path: bin/*.apk
+        if-no-files-found: error
