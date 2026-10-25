@@ -1,4 +1,4 @@
-name: Build Kivy APK
+name: Build Flask APK
 
 on:
   workflow_dispatch:
@@ -9,36 +9,51 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install system deps
         run: |
-          sudo apt update
-          sudo apt install -y openjdk-17-jdk zip unzip git \
-          libltdl-dev libffi-dev libssl-dev \
-          libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
-          libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
-          zlib1g-dev libgstreamer1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+          sudo apt update -y
+          sudo apt install -y openjdk-17-jdk zip unzip git python3-pip autoconf libtool pkg-config \
+          zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo6 libreadline-dev libssl-dev libffi-dev \
+          libsqlite3-dev libbz2-dev libltdl-dev libjpeg-dev libfreetype6-dev \
+          libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
 
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
-          pip install cython==0.29.33 buildozer
+          pip install "cython==0.29.33" buildozer
+          pip install kivy
 
-      - name: Build APK
+      - name: Check files
         run: |
-          yes | buildozer -v android debug
+          ls -la
+          cat app.py | head -20 || echo "no app.py"
+          if [ ! -f buildozer.spec ]; then
+            echo "ERROR: buildozer.spec not found! Creating default..."
+            buildozer init
+          fi
+
+      - name: Build
+        run: |
+          yes | buildozer -v android debug 2>&1 | tee build.log
         env:
           P4A_ACCEPT_SDK_LICENSE_AGREEMENTS: "1"
 
+      - name: Show log if failed
+        if: failure()
+        run: |
+          cat build.log | tail -n 200
+          cat ~/.buildozer/logs/buildozer.log | tail -n 200 || true
+
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: cipher-apk
+          name: apk-debug
           path: bin/*.apk
