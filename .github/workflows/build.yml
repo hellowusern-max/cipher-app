@@ -1,4 +1,4 @@
-name: Build Flask APK
+name: Build Kivy APK - Debug
 
 on:
   workflow_dispatch:
@@ -28,36 +28,27 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install "cython==0.29.33" buildozer
-          pip install kivy
 
-      - name: Check files
+      - name: Build APK
         run: |
-          ls -la
-          cat app.py | head -20 || echo "no app.py"
-          if [ ! -f buildozer.spec ]; then
-            echo "ERROR: buildozer.spec not found! Creating default..."
-            buildozer init
-          fi
-
-      - name: Build
-        run: |
-          yes | buildozer -v android debug 2>&1 | tee build.log
+          yes | buildozer android debug --verbose
         env:
           P4A_ACCEPT_SDK_LICENSE_AGREEMENTS: "1"
 
-      - name: Show log if failed
-        if: failure()
+      - name: ALWAYS Show Logs and Find APK
+        if: always()
         run: |
-          cat build.log | tail -n 200
-          cat ~/.buildozer/logs/buildozer.log | tail -n 200 || true
+          echo "===== LAST 100 LINES OF BUILD LOG ====="
+          cat ~/.buildozer/logs/buildozer.log | tail -n 150 || echo "no buildozer.log"
+          echo "===== SEARCH APK EVERYWHERE ====="
+          find . -type f -name "*.apk" -o -name "*.aab" | head -20
+          echo "===== LIST BIN FOLDER ====="
+          ls -lahR | grep -E "bin|.apk" | head -30
 
-      - name: Upload APK
-        if: success()
+      - name: Upload APK if exists
         uses: actions/upload-artifact@v4
         with:
           name: apk-debug
-          path: 
-              bin/*.apk
-              *.apk
-              **/bin/*.apk
-  
+          path: |
+            bin/*.apk
+            **/*.apk
