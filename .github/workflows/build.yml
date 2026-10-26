@@ -1,54 +1,33 @@
-name: Build Kivy APK - Debug
-
-on:
-  workflow_dispatch:
-  push:
-    branches: [ "main" ]
-
+name: Build Flask APK
+on: workflow_dispatch
 jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Install system deps
+      - name: Install deps
         run: |
-          sudo apt update -y
-          sudo apt install -y openjdk-17-jdk zip unzip git python3-pip autoconf libtool pkg-config \
-          zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo6 libreadline-dev libssl-dev libffi-dev \
-          libsqlite3-dev libbz2-dev libltdl-dev libjpeg-dev libfreetype6-dev \
-          libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
-
-      - name: Install Buildozer
+          sudo apt update
+          sudo apt install -y openjdk-17-jdk zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libffi-dev libssl-dev
+      - name: Install buildozer
+        run: pip install "cython==0.29.33" buildozer
+      - name: Build
         run: |
-          pip install --upgrade pip
-          pip install "cython==0.29.33" buildozer
-
-      - name: Build APK
-        run: |
-          yes | buildozer android debug --verbose
+          yes | buildozer -v android debug 2>&1 | tee build.log
+          echo "--- TAIL LOG ---"
+          tail -n 300 build.log
+          find . -name "*.apk"
         env:
+          ACCEPT: "1"
           P4A_ACCEPT_SDK_LICENSE_AGREEMENTS: "1"
-
-      - name: ALWAYS Show Logs and Find APK
-        if: always()
-        run: |
-          echo "===== LAST 100 LINES OF BUILD LOG ====="
-          cat ~/.buildozer/logs/buildozer.log | tail -n 150 || echo "no buildozer.log"
-          echo "===== SEARCH APK EVERYWHERE ====="
-          find . -type f -name "*.apk" -o -name "*.aab" | head -20
-          echo "===== LIST BIN FOLDER ====="
-          ls -lahR | grep -E "bin|.apk" | head -30
-
-      - name: Upload APK if exists
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: apk-debug
+          name: cipher-apk
           path: |
-            bin/*.apk
             **/*.apk
+            ./bin/*.apk
+            build.log
