@@ -1,33 +1,66 @@
-name: Build Flask APK
+name: Build APK - مع فحص الملفات
 on: workflow_dispatch
+
 jobs:
   build:
     runs-on: ubuntu-22.04
+    
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: تنزيل الكود
+        uses: actions/checkout@v4
+
+      - name: تثبيت Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install deps
+
+      - name: تثبيت المتطلبات
         run: |
-          sudo apt update
-          sudo apt install -y openjdk-17-jdk zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libffi-dev libssl-dev
-      - name: Install buildozer
-        run: pip install "cython==0.29.33" buildozer
-      - name: Build
+          sudo apt update -y
+          sudo apt install -y openjdk-17-jdk zip unzip git autoconf libtool pkg-config zlib1g-dev libncurses5-dev libffi-dev libssl-dev libsqlite3-dev libbz2-dev libltdl-dev libjpeg-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
+
+      - name: تثبيت buildozer
+        run: |
+          pip install --upgrade pip
+          pip install "cython==0.29.33" buildozer
+
+      - name: بناء الـ APK
         run: |
           yes | buildozer -v android debug 2>&1 | tee build.log
-          echo "--- TAIL LOG ---"
-          tail -n 300 build.log
-          find . -name "*.apk"
         env:
-          ACCEPT: "1"
           P4A_ACCEPT_SDK_LICENSE_AGREEMENTS: "1"
-      - name: Upload APK
+
+      - name: 🔍 فحص ايش الملفات الموجودة - هذا اللي سألت عنه
+        if: always()
+        run: |
+          echo "========== 1. وين انا =========="
+          pwd
+          ls -lah
+          echo ""
+          echo "========== 2. هل يوجد مجلد bin؟ =========="
+          ls -lah bin/ || echo ">>> مافي مجلد bin - معناه البناء فشل"
+          echo ""
+          echo "========== 3. البحث عن أي APK في كل المشروع =========="
+          find . -type f -name "*.apk" 2>/dev/null
+          echo ""
+          echo "========== 4. البحث في مجلد buildozer =========="
+          find ~/.buildozer -name "*.apk" 2>/dev/null | head -n 20
+          echo ""
+          echo "========== 5. آخر 100 سطر من سبب الفشل =========="
+          echo "--- من build.log ---"
+          tail -n 100 build.log || echo "مافي build.log"
+          echo ""
+          echo "--- من buildozer.log ---"
+          tail -n 100 ~/.buildozer/logs/buildozer.log 2>/dev/null || echo "مافي buildozer.log"
+
+      - name: رفع الـ APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cipher-apk
+          name: cipher-app-apk
           path: |
+            bin/*.apk
+            *.apk
             **/*.apk
-            ./bin/*.apk
             build.log
+          if-no-files-found: warn
